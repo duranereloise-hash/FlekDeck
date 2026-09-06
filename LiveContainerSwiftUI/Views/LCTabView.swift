@@ -13,7 +13,8 @@ struct LCTabView: View {
     @State var errorShow = false
     @State var crashReportShow = false
     @State var errorInfo = ""
-@State private var didRunPostGateStartup = false
+@State var previousSelectedTab : LCTabIdentifier = .apps
+    @State private var didRunPostGateStartup = false
     
     @EnvironmentObject var sharedModel : SharedModel
     @EnvironmentObject var sceneDelegate: SceneDelegate
@@ -75,13 +76,10 @@ struct LCTabView: View {
                 }
             }
         }
-        .onChange(of: sharedModel.selectedTab) { newValue in
+        .onChange(of: sharedModel.selectedTab) { oldValue, newValue in
             if newValue != LCTabIdentifier.search {
                 previousSelectedTab = newValue
             }
-        }
-        .onChange(of: betaBannerOverride) { _ in
-            updateBetaOverlay()
         }
         .onOpenURL { url in
             dispatchURL(url: url)
@@ -293,11 +291,6 @@ struct LCTabView: View {
 
 func checkiOSBeta() {
         // Bypassed — no beta detection
-        updateBetaOverlay()
-    }
-
-    private func updateBetaOverlay() {
-        BetaOverlayManager.shared.hide()
     }
 
     func checkPrivateContainerBookmark() {
