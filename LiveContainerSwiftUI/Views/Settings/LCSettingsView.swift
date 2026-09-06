@@ -501,8 +501,8 @@ struct LCSettingsView: View {
                     }
                     .padding(.vertical, 6)
                 }
-                // MARK: - Certificate (shown only when no certificate is detected)
-                if sharedModel.multiLCStatus != 2 && !certificateDataFound {
+                // MARK: - Certificate section (hidden — auto-managed, no user cert needed)
+                if false && sharedModel.multiLCStatus != 2 && !certificateDataFound {
                     Section {
                         Button("Import Flekstore certificate") {
                             Task { await importEmbeddedCertificate() }

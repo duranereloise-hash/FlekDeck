@@ -127,25 +127,67 @@
 }
 
 + (NSProgress *)signAppBundleWithZSign:(NSURL *)path completionHandler:(void (^)(BOOL success, NSError *error))completionHandler {
+    NSData *cert = [self certificateData];
+    NSString *pass = LCSharedUtils.certificatePassword;
+    
+    // If no certificate, use adhoc signing on all mach-o files in the bundle
+    if (!cert || !pass) {
+        NSError *err = nil;
+        [self loadStoreFrameworksWithError2:&err];
+        if (err) {
+            completionHandler(NO, err);
+            return nil;
+        }
+        // Find and adhoc-sign all mach-o files
+        NSDirectoryEnumerator *enumerator = [NSFileManager.defaultManager enumeratorAtURL:path includingPropertiesForKeys:nil options:NSDirectoryEnumerationSkipsHiddenFiles errorHandler:nil];
+        BOOL allOk = YES;
+        for (NSURL *fileURL in enumerator) {
+            NSString *ext = fileURL.pathExtension;
+            if ([ext isEqualToString:@"dylib"] || [ext isEqualToString:@"appex"] || [ext isEqualToString:@""]) {
+                // Check if it's a mach-o
+                if (![NSClassFromString(@"ZSigner") adhocSignMachOAtPath:fileURL.path bundleId:NSBundle.mainBundle.bundleIdentifier entitlementData:nil]) {
+                    allOk = NO;
+                }
+            }
+        }
+        completionHandler(allOk, allOk ? nil : [NSError errorWithDomain:@"ZSign" code:1 userInfo:@{NSLocalizedDescriptionKey: @"adhoc signing failed on some files"}]);
+        return nil;
+    }
+    
     NSError *error;
-
-    // use zsign as our signer~
-    // Load libraries from Documents, yeah
     [self loadStoreFrameworksWithError2:&error];
-
     if (error) {
         completionHandler(NO, error);
         return nil;
     }
 
     NSLog(@"[LC] starting signing...");
-    
-    NSProgress* ans = [NSClassFromString(@"ZSigner") signWithAppPath:[path path] bundleId:NSBundle.mainBundle.bundleIdentifier cert:self.certificateData pass:LCSharedUtils.certificatePassword completionHandler:completionHandler];
-    
-    return ans;
+    return [NSClassFromString(@"ZSigner") signWithAppPath:[path path] bundleId:NSBundle.mainBundle.bundleIdentifier cert:cert pass:pass completionHandler:completionHandler];
 }
 
 + (NSProgress *)signFilesWithZSignWithURLs:(NSArray<NSURL*>*)urls completionHandler:(void (^)(BOOL success, NSError *error))completionHandler {
+    NSData *cert = [self certificateData];
+    NSString *pass = LCSharedUtils.certificatePassword;
+    
+    // If no certificate, use adhoc signing
+    if (!cert || !pass) {
+        NSError *err = nil;
+        [self loadStoreFrameworksWithError2:&err];
+        if (err) {
+            completionHandler(NO, err);
+            return nil;
+        }
+        BOOL allOk = YES;
+        for (NSURL *url in urls) {
+            if (![NSClassFromString(@"ZSigner") adhocSignMachOAtPath:url.path bundleId:NSBundle.mainBundle.bundleIdentifier entitlementData:nil]) {
+                allOk = NO;
+                break;
+            }
+        }
+        completionHandler(allOk, allOk ? nil : [NSError errorWithDomain:@"ZSign" code:1 userInfo:@{NSLocalizedDescriptionKey: @"adhoc signing failed"}]);
+        return nil;
+    }
+    
     NSError *error;
     [self loadStoreFrameworksWithError2:&error];
     if (error) {
@@ -157,8 +199,8 @@
         [paths addObject:url.path];
     }
     
-    return [NSClassFromString(@"ZSigner") signMachOPathArr:paths bundleId:NSBundle.mainBundle.bundleIdentifier cert:self.certificateData
-                                                      pass:LCSharedUtils.certificatePassword completionHandler:completionHandler];
+    return [NSClassFromString(@"ZSigner") signMachOPathArr:paths bundleId:NSBundle.mainBundle.bundleIdentifier cert:cert
+                                                       pass:pass completionHandler:completionHandler];
 }
 
 + (NSString*)getCertTeamIdWithKeyData:(NSData*)keyData password:(NSString*)password {
