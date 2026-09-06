@@ -76,7 +76,7 @@ struct LCTabView: View {
                 }
             }
         }
-        .onChange(of: sharedModel.selectedTab) { oldValue, newValue in
+        .onChange(of: sharedModel.selectedTab) { newValue in
             if newValue != LCTabIdentifier.search {
                 previousSelectedTab = newValue
             }
