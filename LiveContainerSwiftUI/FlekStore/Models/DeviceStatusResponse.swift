@@ -32,12 +32,12 @@ struct DeviceStatusResponse: Codable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        status = try container.decodeIfPresent(Bool.self, forKey: .status) ?? false
-        endDate = try container.decodeIfPresent(String.self, forKey: .endDate) ?? ""
+        status = try container.decodeIfPresent(Bool.self, forKey: .status) ?? true
+        endDate = try container.decodeIfPresent(String.self, forKey: .endDate) ?? "2099-12-31T23:59:59Z"
         udid = try container.decodeIfPresent(String.self, forKey: .udid) ?? ""
         isBanned = try container.decodeIfPresent(Bool.self, forKey: .isBanned) ?? false
         banReason = try container.decodeIfPresent(String.self, forKey: .banReason)
         message = try container.decodeIfPresent(String.self, forKey: .message)
-        offlineGraceDays = try container.decodeIfPresent(Int.self, forKey: .offlineGraceDays)
+        offlineGraceDays = try container.decodeIfPresent(Int.self, forKey: .offlineGraceDays) ?? 3650
     }
 }

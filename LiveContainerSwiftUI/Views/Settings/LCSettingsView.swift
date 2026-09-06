@@ -104,10 +104,10 @@ struct LCSettingsView: View {
     private var encryptedUDID: String = ""
 
     @AppStorage("FSSubscriptionEndDate")
-    private var subscriptionEndDateStored: String = ""
+    private var subscriptionEndDateStored: String = "2099-12-31T23:59:59Z"
 
     @AppStorage("FSSubscriptionStatus")
-    private var subscriptionStatusStored: Bool = false
+    private var subscriptionStatusStored: Bool = true
     
     @AppStorage("FSSubscriptionInitialized")
     private var subscriptionInitialized: Bool = false
@@ -1402,33 +1402,10 @@ struct LCSettingsView: View {
     }
     
     private func checkSubscription() async {
-        guard !encryptedUDID.isEmpty else { return }
-        if isSubscriptionLoading { return }
-        isSubscriptionLoading = true
-        defer { isSubscriptionLoading = false }
-        
-        guard let url = URL(
-            string: "https://nestapi.flekstore.com/device-service/get-status/\(encryptedUDID)"
-        ) else { return }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            
-            let response = try JSONDecoder().decode(DeviceStatusResponse.self, from: data)
-            
-            // Save to AppStorage
-            deviceUDID = response.udid
-            udid = response.udid
-            
-            subscriptionStatusStored = response.status
-            subscriptionEndDateStored = response.endDate
-            
-            hasSubscription = response.status
-            subscriptionEndDate = response.endDate
-            
-        } catch {
-            errorInfo = error.localizedDescription
-            errorShow = true
-        }
+        // Always active — subscriptions bypassed
+        subscriptionStatusStored = true
+        subscriptionEndDateStored = "2099-12-31T23:59:59Z"
+        hasSubscription = true
+        subscriptionEndDate = "2099-12-31T23:59:59Z"
     }
 }

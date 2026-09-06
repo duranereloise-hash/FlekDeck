@@ -58,10 +58,10 @@ class FlekstoreAppsListViewModel: ObservableObject {
     private var encryptedUDID: String = ""
 
     @AppStorage("FSSubscriptionEndDate")
-    private var subscriptionEndDateStored: String = ""
+    private var subscriptionEndDateStored: String = "2099-12-31T23:59:59Z"
 
     @AppStorage("FSSubscriptionStatus")
-    private var subscriptionStatusStored: Bool = false
+    private var subscriptionStatusStored: Bool = true
 
     @AppStorage("FSSubscriptionInitialized")
     private var subscriptionInitialized: Bool = false
@@ -401,29 +401,14 @@ class FlekstoreAppsListViewModel: ObservableObject {
     }
 
     private func checkSubscription() async {
-        guard !encryptedUDID.isEmpty else { return }
-
-        guard let url = URL(
-            string: "https://nestapi.flekstore.com/device-service/get-status/\(encryptedUDID)"
-        ) else { return }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let response = try JSONDecoder().decode(DeviceStatusResponse.self, from: data)
-
-            deviceUDID = response.udid
-            subscriptionStatusStored = response.status
-            subscriptionEndDateStored = response.endDate
-
-            hasSubscription = response.status
-            subscriptionEndDate = response.endDate
-
-            isBanned = response.isBanned
-            banReason = formattedBanReason(response.banReason)
-            banMessage = formattedBanMessage(response.message)
-        } catch {
-            // Silent fail: keep cached subscription status.
-        }
+        // Always active — subscriptions bypassed
+        subscriptionStatusStored = true
+        subscriptionEndDateStored = "2099-12-31T23:59:59Z"
+        hasSubscription = true
+        subscriptionEndDate = "2099-12-31T23:59:59Z"
+        isBanned = false
+        banReason = ""
+        banMessage = ""
     }
 
     private func formattedBanReason(_ rawReason: String?) -> String {

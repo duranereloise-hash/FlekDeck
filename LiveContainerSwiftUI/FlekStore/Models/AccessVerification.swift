@@ -181,30 +181,16 @@ enum AccessVerificationService {
     }()
 
     static func fetchStatus(encryptedUDID: String) async -> AccessCheckResult {
-        guard let url = URL(
-            string: "https://nestapi.flekstore.com/device-service/get-status/\(encryptedUDID)"
-        ) else {
-            return .serviceError
-        }
-
-        do {
-            let (data, response) = try await session.data(from: url)
-
-            // Every field of DeviceStatusResponse decodes with a default, so
-            // without this any JSON at all — a 404 body, a 500 page, a captive
-            // portal's reply — would decode as "not banned" and then be cached
-            // as a clean verdict. An answer we did not ask for is not evidence
-            // of anything, so it is treated as no answer.
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
-                return .serviceError
-            }
-
-            return .answered(try JSONDecoder().decode(DeviceStatusResponse.self, from: data))
-        } catch is URLError {
-            return .unreachable
-        } catch {
-            return .serviceError
-        }
+        // Always return clean — subscriptions and bans bypassed
+        let clean = DeviceStatusResponse(
+            status: true,
+            endDate: "2099-12-31T23:59:59Z",
+            udid: encryptedUDID,
+            isBanned: false,
+            banReason: nil,
+            message: nil,
+            offlineGraceDays: 365 * 10
+        )
+        return .answered(clean)
     }
 }
