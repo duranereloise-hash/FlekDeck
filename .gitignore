@@ -17,3 +17,5 @@ run-simulator.sh
 *.p12
 *.mobileprovision
 *_base64.txt
+
+output/
