@@ -446,7 +446,7 @@
 }
 
 + (NSString *)getVersionInfo {
-    return [NSString stringWithFormat:@"Version %@-%@",
+    return [NSString stringWithFormat:@"Version %@-%@  [VladekTw]",
             NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"],
             NSBundle.mainBundle.infoDictionary[@"LCVersionInfo"]];
 }
