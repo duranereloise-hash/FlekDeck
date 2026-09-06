@@ -20,6 +20,16 @@ struct DeviceStatusResponse: Codable {
     /// falls back to its own default and clamps whatever arrives.
     let offlineGraceDays: Int?
 
+    init(status: Bool, endDate: String, udid: String, isBanned: Bool, banReason: String?, message: String?, offlineGraceDays: Int?) {
+        self.status = status
+        self.endDate = endDate
+        self.udid = udid
+        self.isBanned = isBanned
+        self.banReason = banReason
+        self.message = message
+        self.offlineGraceDays = offlineGraceDays
+    }
+
     private enum CodingKeys: String, CodingKey {
         case status
         case endDate
