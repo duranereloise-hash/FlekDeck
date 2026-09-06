@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import ObjectiveC
+import Security
 
 struct LCTabView: View {
     @State var errorShow = false
@@ -287,6 +288,46 @@ struct LCTabView: View {
         checkPrivateContainerBookmark()
         checkiOSBeta()
         processPendingURLIfNeeded()
+        autoImportSideStoreCert()
+    }
+
+    private func autoImportSideStoreCert() {
+        guard LCSharedUtils.certificatePassword() == nil else {
+            return // cert already imported
+        }
+        guard UserDefaults.sideStoreExist() else {
+            return // no SideStore bundle
+        }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "signingCertificate",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecAttrService as String: "com.kdt.livecontainer",
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data else { return }
+
+        let passwordQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "signingCertificatePassword",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecAttrService as String: "com.kdt.livecontainer",
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
+        ]
+        var passwordItem: CFTypeRef?
+        let passwordStatus = SecItemCopyMatching(passwordQuery as CFDictionary, &passwordItem)
+        var password = ""
+        if passwordStatus == errSecSuccess, let passwordData = passwordItem as? Data, let pwd = String(data: passwordData, encoding: .utf8) {
+            password = pwd
+        }
+
+        LCUtils.appGroupUserDefault.set(data, forKey: "LCCertificateData")
+        LCUtils.appGroupUserDefault.set(password, forKey: "LCCertificatePassword")
+        LCUtils.appGroupUserDefault.set(Date.now, forKey: "LCCertificateUpdateDate")
     }
 
 func checkiOSBeta() {

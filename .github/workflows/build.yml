@@ -33,18 +33,95 @@ jobs:
             CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
           | xcpretty
 
-      - name: Create IPA
+      - name: Prepare tools and SideStore
+        run: |
+          brew install ldid wget
+          wget https://github.com/LiveContainer/dylibify/releases/download/1.0/dylibify
+          chmod +x dylibify
+          mkdir -p tmp
+
+      - name: Create IPA with bundled SideStore
         run: |
           mkdir -p build/Payload
           cp -r build/LiveContainer.xcarchive/Products/Applications/FlekDeck.app build/Payload/
-          cd build
-          zip -r LiveContainer.ipa Payload
-          rm -rf Payload
-          echo "IPA created successfully:"
-          ls -lh LiveContainer.ipa
 
-      - name: Upload IPA artifact
+          # Move SideStoreSupport out temporarily for the clean IPA
+          mv build/Payload/FlekDeck.app/Frameworks/SideStoreSupport.framework ./tmp/
+
+          # Create a clean IPA first (without SideStore, for sideloading via AltStore/Sideloadly)
+          cd build
+          zip -r LiveContainer.ipa Payload -x "._*" -x ".DS_Store" -x "__MACOSX"
+          cd ..
+
+          # Restore SideStoreSupport
+          mv ./tmp/SideStoreSupport.framework build/Payload/FlekDeck.app/Frameworks
+
+          # Add SideStore entitlement keys to Info.plist
+          /usr/libexec/PlistBuddy -c 'Add :ALTAppGroups array' ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Add :ALTAppGroups:0 string group.com.SideStore.SideStore' ./build/Payload/FlekDeck.app/Info.plist
+
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:1 dict" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:1:CFBundleURLName string com.fs.flekdeck.sidestoreurlscheme" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:1:CFBundleURLSchemes array" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:1:CFBundleURLSchemes:0 string sidestore" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:2 dict" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:2:CFBundleURLName string com.fs.flekdeck.sidestorebackupurlscheme" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:2:CFBundleURLSchemes array" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:2:CFBundleURLSchemes:0 string sidestore-com.fs.flekdeck" ./build/Payload/FlekDeck.app/Info.plist
+
+          /usr/libexec/PlistBuddy -c "Add :INIntentsSupported array" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :INIntentsSupported:0 string RefreshAllIntent" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :INIntentsSupported:1 string ViewAppIntent" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSUserActivityTypes array" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSUserActivityTypes:0 string RefreshAllIntent" ./build/Payload/FlekDeck.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSUserActivityTypes:1 string ViewAppIntent" ./build/Payload/FlekDeck.app/Info.plist
+
+          /usr/libexec/PlistBuddy -c "Add :PreferenceSpecifiers:3:Type string PSToggleSwitchSpecifier" ./build/Payload/FlekDeck.app/Settings.bundle/Root.plist || true
+          /usr/libexec/PlistBuddy -c "Add :PreferenceSpecifiers:3:Title string Open SideStore" ./build/Payload/FlekDeck.app/Settings.bundle/Root.plist || true
+          /usr/libexec/PlistBuddy -c "Add :PreferenceSpecifiers:3:Key string LCOpenSideStore" ./build/Payload/FlekDeck.app/Settings.bundle/Root.plist || true
+          /usr/libexec/PlistBuddy -c "Add :PreferenceSpecifiers:3:DefaultValue bool false" ./build/Payload/FlekDeck.app/Settings.bundle/Root.plist || true
+
+          # Download and embed SideStore
+          cd tmp
+          wget -q https://github.com/LiveContainer/SideStore/releases/download/nightly/SideStore.ipa
+          unzip -q SideStore.ipa
+          cd ..
+
+          mv ./tmp/Payload/SideStore.app ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework
+          ./dylibify ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/SideStore ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/SideStore.dylib
+          rm ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/SideStore
+          mv ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/SideStore.dylib ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/SideStore
+          ldid -S"" ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/SideStore
+          cp ./.github/sidelc/LCAppInfo.plist ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/
+
+          # Copy intents
+          cp ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/Intents.intentdefinition ./build/Payload/FlekDeck.app/ 2>/dev/null || true
+          cp ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/ViewApp.intentdefinition ./build/Payload/FlekDeck.app/ 2>/dev/null || true
+          cp -r ./build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/Metadata.appintents ./build/Payload/FlekDeck.app/Metadata.appintents 2>/dev/null || true
+
+          # Sign adhoc
+          ldid -S.github/sidelc/LiveWidgetExtension_adhoc.xml ./build/Payload/FlekDeck.app/PlugIns/LiveWidgetExtension.appex/LiveWidgetExtension 2>/dev/null || true
+
+          rm -rf tmp
+
+          echo "Verifying SideStore is embedded:"
+          ls -lh build/Payload/FlekDeck.app/Frameworks/SideStoreApp.framework/
+
+          cd build
+          zip -r LiveContainer+SideStore.ipa Payload -x "._*" -x ".DS_Store" -x "__MACOSX"
+          rm -rf Payload
+          echo ""
+          echo "IPA created successfully:"
+          ls -lh *.ipa
+
+      - name: Upload IPA artifact (no SideStore)
         uses: actions/upload-artifact@v4
         with:
           name: LiveContainer.ipa
           path: build/LiveContainer.ipa
+
+      - name: Upload IPA artifact (with SideStore)
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiveContainer+SideStore.ipa
+          path: build/LiveContainer+SideStore.ipa

@@ -85,7 +85,7 @@ struct LCSettingsView: View {
     @AppStorage("LCSideJITServerAddress", store: LCUtils.appGroupUserDefault) var sideJITServerAddress : String = ""
     @AppStorage("LCDeviceUDID", store: LCUtils.appGroupUserDefault) var deviceUDID: String = ""
     @AppStorage("FSDeviceUDID") private var fsDeviceUDID: String = ""
-    @AppStorage("LCJITEnablerType", store: LCUtils.appGroupUserDefault) var JITEnabler: JITEnablerType = .SideJITServer
+    @AppStorage("LCJITEnablerType", store: LCUtils.appGroupUserDefault) var JITEnabler: JITEnablerType = .SideStore
     
     @State var store : Store = .Unknown
     
@@ -501,8 +501,8 @@ struct LCSettingsView: View {
                     }
                     .padding(.vertical, 6)
                 }
-                // MARK: - Certificate section (hidden — auto-managed, no user cert needed)
-                if false && sharedModel.multiLCStatus != 2 && !certificateDataFound {
+                // MARK: - Certificate section (auto-import from SideStore; manual import available)
+                if sharedModel.multiLCStatus != 2 && !certificateDataFound {
                     Section {
                         Button("Import Flekstore certificate") {
                             Task { await importEmbeddedCertificate() }
@@ -510,6 +510,11 @@ struct LCSettingsView: View {
                         
                         Button("lc.settings.importCertificate".loc) {
                             Task { await importCertificate() }
+                        }
+                        if UserDefaults.sideStoreExist() {
+                            Button("Import from SideStore") {
+                                Task { await importCertificateFromSideStore() }
+                            }
                         }
                     } header: {
                         Text("lc.settings.jitLess".loc)
